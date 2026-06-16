@@ -810,6 +810,553 @@
       ],
       "id": "c579c379-246a-4c5e-8fdd-8789351fe340",
       "name": "Sticky Note9"
+    },
+    {
+      "parameters": {
+        "path": "60db-fo-tts",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        224,
+        1720
+      ],
+      "id": "fo-tts-webhook",
+      "name": "TTS Webhook (60db FO)",
+      "webhookId": "60db-fo-tts"
+    },
+    {
+      "parameters": {
+        "content": "## TTS  —  ElevenLabs primary → 60db fallback\n### GET ?text=&elVoiceId=&voiceId60db=",
+        "height": 176,
+        "width": 1300,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        1680
+      ],
+      "id": "fo-tts-note",
+      "name": "SN-fo-tts-note"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.elevenlabs.io/v1/text-to-speech/{{ $json.query.elVoiceId || '21m00Tcm4TlvDq8ikWAM' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "audio/mpeg"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.query.text, model_id: 'eleven_turbo_v2_5' }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        1720
+      ],
+      "id": "fo-tts-el",
+      "name": "ElevenLabs TTS",
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EL_HEADER_CRED",
+          "name": "ElevenLabs API (xi-api-key header)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.60db.ai/tts-synthesize",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $('TTS Webhook (60db FO)').item.json.query.text, voice_id: $('TTS Webhook (60db FO)').item.json.query.voiceId60db, output_format: 'mp3', enhance: true }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        1780
+      ],
+      "id": "fo-tts-60db",
+      "name": "60db TTS (fallback)",
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "DB60_HEADER_CRED",
+          "name": "60db API (Authorization: Bearer)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const it = items[0] || { json: {} };\nlet provider = 'none', audio_base64 = null, format = 'mp3', sample_rate = null, error = null;\nif (it.binary && it.binary.data) {                 // ElevenLabs success (binary file)\n  provider = 'elevenlabs';\n  audio_base64 = it.binary.data.data;\n  format = it.binary.data.fileExtension || 'mp3';\n} else if (it.json && it.json.audio_base64) {      // 60db success\n  provider = '60db';\n  audio_base64 = it.json.audio_base64;\n  format = it.json.output_format || 'mp3';\n  sample_rate = it.json.sample_rate || null;\n} else {                                            // both failed\n  error = (it.json && (it.json.message || it.json.error)) || 'TTS failed on both ElevenLabs and 60db';\n}\nreturn [{ json: { success: !!audio_base64, provider, audio_base64, format, sample_rate, error } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        1720
+      ],
+      "id": "fo-tts-norm",
+      "name": "Normalize TTS",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1180,
+        1720
+      ],
+      "id": "fo-tts-resp",
+      "name": "Respond TTS"
+    },
+    {
+      "parameters": {
+        "path": "60db-fo-tts-stream",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        224,
+        1920
+      ],
+      "id": "fo-ttss-webhook",
+      "name": "TTS Stream Webhook (60db FO)",
+      "webhookId": "60db-fo-tts-stream"
+    },
+    {
+      "parameters": {
+        "content": "## TTS Stream  —  ElevenLabs /stream primary → 60db /tts-stream (NDJSON) fallback\n### Note: returns assembled base64. True WebSocket (wss://api.60db.ai/ws/tts) is not supported by the n8n HTTP node — use a Code node with the `ws` lib or an external worker for that.",
+        "height": 176,
+        "width": 1300,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        1880
+      ],
+      "id": "fo-ttss-note",
+      "name": "SN-fo-ttss-note"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.elevenlabs.io/v1/text-to-speech/{{ $json.query.elVoiceId || '21m00Tcm4TlvDq8ikWAM' }}/stream",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "audio/mpeg"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.query.text, model_id: 'eleven_turbo_v2_5' }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        1920
+      ],
+      "id": "fo-ttss-el",
+      "name": "ElevenLabs TTS Stream",
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EL_HEADER_CRED",
+          "name": "ElevenLabs API (xi-api-key header)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.60db.ai/tts-stream",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $('TTS Stream Webhook (60db FO)').item.json.query.text, voice_id: $('TTS Stream Webhook (60db FO)').item.json.query.voiceId60db }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        1980
+      ],
+      "id": "fo-ttss-60db",
+      "name": "60db TTS Stream (fallback)",
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "DB60_HEADER_CRED",
+          "name": "60db API (Authorization: Bearer)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const it = items[0] || { json: {} };\nlet provider = 'none', audio_base64 = null, format = 'mp3', error = null;\nif (it.binary && it.binary.data) {                       // ElevenLabs stream -> binary\n  provider = 'elevenlabs';\n  audio_base64 = it.binary.data.data;\n  format = it.binary.data.fileExtension || 'mp3';\n} else if (it.json && typeof it.json.data === 'string') { // 60db NDJSON text\n  const bufs = [];\n  for (const line of it.json.data.split('\\n')) {\n    const t = line.trim();\n    if (!t) continue;\n    try {\n      const o = JSON.parse(t);\n      if (o.type === 'chunk' && o.result && o.result.audioContent) {\n        bufs.push(Buffer.from(o.result.audioContent, 'base64'));\n      } else if (o.type === 'error') {\n        error = o.message || 'stream error';\n      }\n    } catch (e) { /* skip non-JSON lines */ }\n  }\n  if (bufs.length) { provider = '60db'; audio_base64 = Buffer.concat(bufs).toString('base64'); }\n} else {\n  error = (it.json && (it.json.message || it.json.error)) || 'TTS stream failed on both providers';\n}\nreturn [{ json: { success: !!audio_base64, provider, audio_base64, format, error } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        1920
+      ],
+      "id": "fo-ttss-norm",
+      "name": "Normalize TTS Stream",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1180,
+        1920
+      ],
+      "id": "fo-ttss-resp",
+      "name": "Respond TTS Stream"
+    },
+    {
+      "parameters": {
+        "path": "60db-fo-stt",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        224,
+        2120
+      ],
+      "id": "fo-stt-webhook",
+      "name": "STT Webhook (60db FO)",
+      "webhookId": "60db-fo-stt"
+    },
+    {
+      "parameters": {
+        "content": "## STT  —  ElevenLabs scribe primary → 60db /stt fallback\n### GET ?audioUrl=  (audio is downloaded, then sent as multipart file)",
+        "height": 176,
+        "width": 1300,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        2080
+      ],
+      "id": "fo-stt-note",
+      "name": "SN-fo-stt-note"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.query.audioUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        360,
+        2120
+      ],
+      "id": "fo-stt-dl",
+      "name": "Download Audio"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.elevenlabs.io/v1/speech-to-text",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "contentType": "multipart-form-data",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "model_id",
+              "value": "scribe_v1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        2120
+      ],
+      "id": "fo-stt-el",
+      "name": "ElevenLabs STT",
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EL_HEADER_CRED",
+          "name": "ElevenLabs API (xi-api-key header)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.60db.ai/stt",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "contentType": "multipart-form-data",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "language",
+              "value": "auto"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        2180
+      ],
+      "id": "fo-stt-60db",
+      "name": "60db STT (fallback)",
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "DB60_HEADER_CRED",
+          "name": "60db API (Authorization: Bearer)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const it = items[0] || { json: {} };\nconst j = it.json || {};\nlet provider = 'none', text = null, language = null, segments = [], error = null;\nif (j.request_id !== undefined && j.text !== undefined) {        // 60db\n  provider = '60db'; text = j.text; language = j.language || null; segments = j.segments || [];\n} else if (j.text !== undefined && (j.language_code !== undefined || j.words !== undefined)) { // ElevenLabs\n  provider = 'elevenlabs'; text = j.text; language = j.language_code || null;\n} else if (j.text !== undefined) {                               // best-effort\n  provider = 'unknown'; text = j.text;\n} else {\n  error = j.message || j.error || 'STT failed on both ElevenLabs and 60db';\n}\nreturn [{ json: { success: text !== null, provider, text, language, segments, error } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        2120
+      ],
+      "id": "fo-stt-norm",
+      "name": "Normalize STT",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1180,
+        2120
+      ],
+      "id": "fo-stt-resp",
+      "name": "Respond STT"
+    },
+    {
+      "parameters": {
+        "path": "60db-fo-voices",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        224,
+        2320
+      ],
+      "id": "fo-voices-webhook",
+      "name": "Voices Webhook (60db FO)",
+      "webhookId": "60db-fo-voices"
+    },
+    {
+      "parameters": {
+        "content": "## Voices  —  ElevenLabs /v1/voices primary → 60db /myvoices fallback",
+        "height": 176,
+        "width": 1300,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        2280
+      ],
+      "id": "fo-voices-note",
+      "name": "SN-fo-voices-note"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.elevenlabs.io/v1/voices",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        2320
+      ],
+      "id": "fo-voices-el",
+      "name": "ElevenLabs Voices",
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EL_HEADER_CRED",
+          "name": "ElevenLabs API (xi-api-key header)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.60db.ai/myvoices",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        2380
+      ],
+      "id": "fo-voices-60db",
+      "name": "60db Voices (fallback)",
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "DB60_HEADER_CRED",
+          "name": "60db API (Authorization: Bearer)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const it = items[0] || { json: {} };\nconst j = it.json || {};\nlet provider = 'none', voices = [], error = null;\nif (Array.isArray(j.voices)) {                       // ElevenLabs\n  provider = 'elevenlabs';\n  voices = j.voices.map(v => ({ voice_id: v.voice_id, name: v.name, category: v.category || null, labels: v.labels || {} }));\n} else if (Array.isArray(j.data)) {                  // 60db\n  provider = '60db';\n  voices = j.data.map(v => ({ voice_id: v.voice_id, name: v.name, category: v.category || null, model: v.model || null, labels: v.labels || {} }));\n} else {\n  error = j.message || j.error || 'Voice listing failed on both ElevenLabs and 60db';\n}\nreturn [{ json: { success: !error, provider, count: voices.length, voices, error } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        2320
+      ],
+      "id": "fo-voices-norm",
+      "name": "Normalize Voices",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1180,
+        2320
+      ],
+      "id": "fo-voices-resp",
+      "name": "Respond Voices"
+    },
+    {
+      "parameters": {
+        "content": "## 🔁 60db Failover Layer\n### ElevenLabs primary · 60db automatic fallback · normalized output\n### Endpoints: /60db-fo-tts · /60db-fo-tts-stream · /60db-fo-stt · /60db-fo-voices",
+        "height": 760,
+        "width": 1360,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        1620
+      ],
+      "id": "fo-section-note",
+      "name": "SN-60db-section"
     }
   ],
   "pinData": {},
@@ -1017,6 +1564,249 @@
         [
           {
             "node": "Respond to Webhook6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TTS Webhook (60db FO)": {
+      "main": [
+        [
+          {
+            "node": "ElevenLabs TTS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ElevenLabs TTS": {
+      "main": [
+        [
+          {
+            "node": "Normalize TTS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "60db TTS (fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "60db TTS (fallback)": {
+      "main": [
+        [
+          {
+            "node": "Normalize TTS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize TTS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize TTS": {
+      "main": [
+        [
+          {
+            "node": "Respond TTS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TTS Stream Webhook (60db FO)": {
+      "main": [
+        [
+          {
+            "node": "ElevenLabs TTS Stream",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ElevenLabs TTS Stream": {
+      "main": [
+        [
+          {
+            "node": "Normalize TTS Stream",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "60db TTS Stream (fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "60db TTS Stream (fallback)": {
+      "main": [
+        [
+          {
+            "node": "Normalize TTS Stream",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize TTS Stream",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize TTS Stream": {
+      "main": [
+        [
+          {
+            "node": "Respond TTS Stream",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "STT Webhook (60db FO)": {
+      "main": [
+        [
+          {
+            "node": "Download Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Audio": {
+      "main": [
+        [
+          {
+            "node": "ElevenLabs STT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ElevenLabs STT": {
+      "main": [
+        [
+          {
+            "node": "Normalize STT",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "60db STT (fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "60db STT (fallback)": {
+      "main": [
+        [
+          {
+            "node": "Normalize STT",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize STT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize STT": {
+      "main": [
+        [
+          {
+            "node": "Respond STT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voices Webhook (60db FO)": {
+      "main": [
+        [
+          {
+            "node": "ElevenLabs Voices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ElevenLabs Voices": {
+      "main": [
+        [
+          {
+            "node": "Normalize Voices",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "60db Voices (fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "60db Voices (fallback)": {
+      "main": [
+        [
+          {
+            "node": "Normalize Voices",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize Voices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Voices": {
+      "main": [
+        [
+          {
+            "node": "Respond Voices",
             "type": "main",
             "index": 0
           }
